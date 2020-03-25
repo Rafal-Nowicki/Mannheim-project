@@ -3,14 +3,23 @@ if(!is.null(dev.list())) dev.off()
 cat("\014")
 
 library(eurostat)
+library(bdl)
+
 library(rgdal)
 library(sp)
 library(spdep)
 library(tidyverse)
 
+#### EUROSTAT API ####
+
+
 search_eurostat("unemployment") %>%
   arrange(desc(`last update of data`)) %>%
   head(10)
+
+
+tertiary <- search_eurostat("tertiary") %>%
+  arrange(desc(`last update of data`))
 
 
 gdp <- get_eurostat("nama_10r_2gdp") %>%
@@ -39,6 +48,7 @@ df <- gdp %>%
   inner_join(unemp, by = "geo") %>%
   inner_join(gva_grwth, by = "geo")
 
+#### DE MAP NUTS2 ####
 
 map <- readOGR(".",'NUTS_RG_10M_2016_4326_LEVL_2') %>%
   spTransform("+proj=longlat")
@@ -47,9 +57,10 @@ map <-map[map@data$CNTR_CODE %in% "DE",]
 
 plot(map)
 
-summary(lm(data = df, houshold_income ~ unemployment))
+#### BDL API ####
 
-tertiary <- search_eurostat("tertiary") %>%
-  arrange(desc(`last update of data`))
+search_variables("wynagrodzenie")%>%
+  head(15)
 
+unemp_pl <- get_data_by_variable("196229", unitLevel = "3", year = 2017)
 
