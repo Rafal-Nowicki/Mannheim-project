@@ -40,10 +40,16 @@ df <- gdp %>%
   inner_join(gva_grwth, by = "geo")
 
 
-
 map <- readOGR(".",'NUTS_RG_10M_2016_4326_LEVL_2') %>%
   spTransform("+proj=longlat")
 
 map <-map[map@data$CNTR_CODE %in% "DE",]
 
 plot(map)
+
+summary(lm(data = df, houshold_income ~ unemployment))
+
+tertiary <- search_eurostat("tertiary") %>%
+  arrange(desc(`last update of data`))
+
+
