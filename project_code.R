@@ -41,8 +41,6 @@ df <- gdp %>%
 
 
 
-
-
 map <- readOGR(".",'NUTS_RG_10M_2016_4326_LEVL_2') %>%
   spTransform("+proj=longlat")
 
