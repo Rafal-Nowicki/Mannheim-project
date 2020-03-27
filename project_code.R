@@ -58,8 +58,23 @@ map <- map[map@data$CNTR_CODE %in% "DE", ]
 plot(map)
 
 #### BDL API ####
+search_variables("bezrobocia") %>%
+  View()
 
-search_variables("wynagrodzenie") %>%
-  head(15)
+get_variables("P2497")
 
-unemp_pl <- get_data_by_variable("196229", unitLevel = "3", year = 2017)
+wages_pow <- get_data_by_variable("64428", unitLevel = "5", year = 2017)
+
+get_variables("P2392")
+
+unemp_pow <- get_data_by_variable("60270", unitLevel = "5", year = 2017)
+
+search_variables("uczelnie") %>%
+  View()
+
+
+
+
+
+
+
