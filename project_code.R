@@ -18,16 +18,16 @@ search_eurostat("unemployment") %>%
   head(10)
 
 
-tertiary <- search_eurostat("tertiary") %>%
-  arrange(desc(`last update of data`))
+#tertiary <- search_eurostat("tertiary") %>%
+#  arrange(desc(`last update of data`))
 
-idx_t <- which(grepl("NUTS2", tertiary$title))
+#idx_t <- which(grepl("NUTS2", tertiary$title))
 
-tertiary[idx_t,] %>%
-  View()
+#tertiary[idx_t,] %>%
+#  View()
 
-tertiary_ratio <- get_eurostat("educ_uoe_enrt06") %>%
-  subset(grepl("DE([0-9]|[A-Z]){2}", geo))
+#tertiary_ratio <- get_eurostat("educ_uoe_enrt06") %>%
+#  subset(grepl("DE([0-9]|[A-Z]){2}", geo))
 
 
 gdp <- get_eurostat("nama_10r_2gdp") %>%
@@ -50,45 +50,60 @@ gva_grwth <- get_eurostat("nama_10r_2gvagr") %>%
   filter(time == "2017-01-01", unit == "PCH_PRE") %>%
   transmute(geo, gva_growth = values)
 
+res_dev <- get_eurostat("rd_e_gerdreg") %>%
+  subset(grepl("DE([0-9]|[A-Z]){2}", geo)) %>%
+  filter(time == "2017-01-01", sectperf == "TOTAL", unit == "EUR_HAB") %>%
+  transmute(geo, res_dev = values)
+
 
 df <- gdp %>%
   inner_join(hh_inc, by = "geo") %>%
   inner_join(unemp, by = "geo") %>%
-  inner_join(gva_grwth, by = "geo")
+  inner_join(gva_grwth, by = "geo") %>%
+  inner_join(res_dev, by = "geo")
 
-#### DE MAP NUTS2 ####
+
+# linear model for Germany #
+
+model_germany <- lm(data = df, household_income ~ unemployment + gva_growth + res_dev)
+summary(model_germany)
+
+# map preparing
 
 map <- readOGR(".", "NUTS_RG_10M_2016_4326_LEVL_2") %>%
   spTransform("+proj=longlat")
 
 map <- map[map@data$CNTR_CODE %in% "DE", ]
 
-plot(map)
+#spatial data merging
 
-# linear model for Germany #
+spatial_data <- merge(y = df, x = map, by.y = "geo", by.x = "NUTS_ID")
+spatial_data$res <- model_germany$residuals
 
-model_germany <- lm(data = df, household_income ~ unemployment + gva_growth)
-summary(model_germany)
 
-ger_res <- model_germany$residuals
+#### DE MAP NUTS2 ####
+pal <- colorRampPalette(c("red","white" ,"green"))
 
-df_res <- cbind(df, ger_res)
-map$NUTS_ID
-
-spatial_data <- merge(y = df_res, x = map, by.y = "geo", by.x = "NUTS_ID")
-
-green_area <- rgb(24, 121, 104, 80, names = NULL, maxColorValue = 255)
-pal <- colorRampPalette(c("white", green_area), bias = 1)
-pal <- colorRampPalette(c("red", "green"))
-
-spplot(spatial_data, zcol = "ger_res", colorkey = TRUE, col.regions = pal(100), cuts = 99,
+spplot(spatial_data, zcol = "res", colorkey = TRUE, col.regions = pal(100), cuts = 99,
        par.settings = list(axis.line = list(col =  'transparent')),
-       main = "residuals from regression")
+       main = "Residuals from regression")
+
+### Weight matrix ###
+
+cont <- poly2nb(spatial_data, queen = T)
+W_list <- nb2listw(cont, style = "W") # row normalization
+W <- listw2mat(W_list)
+
+centroids <- coordinates(spatial_data)
+plot.nb(cont, centroids, pch = 16)
+
+# Spatial dependency test
+moran.test(spatial_data@data$res, W_list)
 
 
 #### BDL API ####
-search_variables("bezrobocia") %>%
-  View()
+#search_variables("bezrobocia") %>%
+#  View()
 
 get_variables("P2497")
 
@@ -98,8 +113,8 @@ get_variables("P2392")
 
 unemp_pow <- get_data_by_variable("60270", unitLevel = "5", year = 2017)
 
-search_variables("uczelnie") %>%
-  View()
+#search_variables("uczelnie") %>%
+#  View()
 
 
 
