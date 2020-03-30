@@ -9,25 +9,14 @@ library(rgdal)
 library(sp)
 library(spdep)
 library(tidyverse)
+library(ggcorrplot)
 
 #### EUROSTAT API ####
 
 
-search_eurostat("unemployment") %>%
-  arrange(desc(`last update of data`)) %>%
-  head(10)
-
-
-#tertiary <- search_eurostat("tertiary") %>%
-#  arrange(desc(`last update of data`))
-
-#idx_t <- which(grepl("NUTS2", tertiary$title))
-
-#tertiary[idx_t,] %>%
-#  View()
-
-#tertiary_ratio <- get_eurostat("educ_uoe_enrt06") %>%
-#  subset(grepl("DE([0-9]|[A-Z]){2}", geo))
+nuts2 <- search_eurostat("NUTS 2") %>%
+  filter(`data end` >= 2017) %>%
+  arrange(desc(`last update of data`))
 
 
 gdp <- get_eurostat("nama_10r_2gdp") %>%
@@ -55,18 +44,31 @@ res_dev <- get_eurostat("rd_e_gerdreg") %>%
   filter(time == "2017-01-01", sectperf == "TOTAL", unit == "EUR_HAB") %>%
   transmute(geo, res_dev = values)
 
+tert <- get_eurostat("edat_lfse_04") %>%
+  subset(grepl("DE([0-9]|[A-Z]){2}", geo)) %>%
+  filter(time == "2017-01-01", sex == "T", isced11 == "ED5-8") %>%
+  transmute(geo, tert = values)
+
+
 
 df <- gdp %>%
   inner_join(hh_inc, by = "geo") %>%
   inner_join(unemp, by = "geo") %>%
   inner_join(gva_grwth, by = "geo") %>%
-  inner_join(res_dev, by = "geo")
+  inner_join(res_dev, by = "geo") %>%
+  inner_join(tert, by = "geo")
 
 
 # linear model for Germany #
 
 model_germany <- lm(data = df, household_income ~ unemployment + gva_growth + res_dev)
 summary(model_germany)
+
+
+cor(df[,-1]) %>%
+  ggcorrplot(hc.order = T, type = "lower", lab = T)
+
+
 
 # map preparing
 
@@ -95,11 +97,11 @@ W_list <- nb2listw(cont, style = "W") # row normalization
 W <- listw2mat(W_list)
 
 centroids <- coordinates(spatial_data)
-plot.nb(cont, centroids, pch = 16)
+plot.nb(cont, centroids, pch = 7)
 
 # Spatial dependency test
 moran.test(spatial_data@data$res, W_list)
-
+moran.plot(spatial_data@data$res, W_list)
 
 #### BDL API ####
 #search_variables("bezrobocia") %>%
