@@ -49,6 +49,17 @@ tert <- get_eurostat("edat_lfse_04") %>%
   filter(time == "2017-01-01", sex == "T", isced11 == "ED5-8") %>%
   transmute(geo, tert = values)
 
+fert <- get_eurostat("demo_r_frate2") %>%
+  subset(grepl("DE([0-9]|[A-Z]){2}", geo)) %>%
+  filter(time == "2017-01-01", age == "TOTAL", unit == "NR") %>%
+  transmute(geo, fert = values)
+
+work_h <- get_eurostat("lfst_r_lfe2ehour") %>%
+  subset(grepl("DE([0-9]|[A-Z]){2}", geo)) %>%
+  filter(time == "2017-01-01", sex == "T", age == "Y20-64", unit == "HR") %>%
+  transmute(geo, work_h = values)
+
+
 
 
 df <- gdp %>%
@@ -56,7 +67,9 @@ df <- gdp %>%
   inner_join(unemp, by = "geo") %>%
   inner_join(gva_grwth, by = "geo") %>%
   inner_join(res_dev, by = "geo") %>%
-  inner_join(tert, by = "geo")
+  inner_join(tert, by = "geo") %>%
+  inner_join(fert, by = "geo") %>%
+  inner_join(work_h, by = "geo")
 
 
 # linear model for Germany #
