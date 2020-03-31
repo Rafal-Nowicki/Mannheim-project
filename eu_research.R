@@ -46,7 +46,7 @@ gva_grwth <- get_eurostat("nama_10r_2gvagr") %>%
 # Research and Developement Expenditures (euro per inhabitant)
 res_dev <- get_eurostat("rd_e_gerdreg") %>%
   subset(grepl("(DE|AT|FR|NL|BE)([0-9]|[A-Z]){2}", geo)) %>%
-  filter(time == "2013-01-01", sectperf == "TOTAL", unit == "EUR_HAB") %>%
+  filter(time == "2017-01-01", sectperf == "TOTAL", unit == "EUR_HAB") %>%
   transmute(geo, res_dev = values)
 
 # Percent of people aged 20-64 with tertiary degree ISCED 5-8
@@ -194,16 +194,20 @@ df_complete <- complete(df_imputed,1) %>%
 ### LINEAR MODELS on completed data ###
 spatial_data_complete <- merge(y = df_complete, x = map, by.y = "geo", by.x = "NUTS_ID")
 
+
+#SIMPLE REGRESSION
 model_eu_complete <- lm(data = spatial_data_complete@data, household_income ~ unemployment)
 summary(model_eu_complete)
 length(model_eu$residuals)
 
+
+#MULTIPLE REGRESSION
 model_eu2_complete <- lm(data = spatial_data_complete@data, household_income ~ unemployment + hh_urb_per +
-                  res_dev + gva_growth + ht_perc, na.action = na.exclude)
+                  res_dev + gva_growth + ht_perc)
 summary(model_eu2_complete)
 length(model_eu2$residuals)
 
-## Residuals distribution ##
+## Residuals spatial distribution ##
 
 spatial_data_complete$res <- model_eu_complete$residuals
 spatial_data_complete$res2 <- model_eu2_complete$residuals
@@ -215,6 +219,8 @@ res_plot <- spplot(spatial_data_complete, zcol = "res", colorkey = TRUE, col.reg
 res_plot2 <- spplot(spatial_data_complete, zcol = "res2", colorkey = TRUE, col.regions = pal(100), cuts = 99,
                    par.settings = list(axis.line = list(col =  'transparent')),
                    main = "Residuals from multiple regression")
+
+grid.arrange(res_plot, res_plot2)
 
 ### Weight matrices ###
 centroids <- coordinates(spatial_data_complete)
@@ -235,30 +241,123 @@ plot.nb(cont2, centroids, pch = 16, col = "grey")
 # Spatial dependency test
 
 #W1
-moran.test(spatial_data_complete@data$res, W_list)
+# on residuals from simple regression
+
+moran.test(spatial_data_complete@data$res, W_list) # same as line below
+lm.morantest(model_eu_complete, listw = W_list) #same as line above
+
 moran.plot(spatial_data_complete@data$res, W_list)
 
 loc_mor <- localmoran(spatial_data_complete@data$res, W_list, p.adjust.method = "bonferroni")
-spatial_data_complete@data$loc_mor_i <- loc_mor[,1]
-spatial_data_complete@data$loc_mor_pv <- loc_mor[,5]
+spatial_data_complete@data$loc_mor_i_res_w <- loc_mor[,1]
+spatial_data_complete@data$loc_mor_pv_res_w <- loc_mor[,5]
 
-spplot(spatial_data_complete, zcol = "loc_mor_pv", colorkey = TRUE, col.regions = pal(100), cuts = 99,
+spplot(spatial_data_complete, zcol = "loc_mor_pv_res_w", colorkey = TRUE, col.regions = pal(100), cuts = 99,
        par.settings = list(axis.line = list(col =  'transparent')),
-       main = "LISA bonferroni p-value")
+       main = "LISA bonferroni p-value on res from simp reg W1")
+
+################################################################
+lm.LMtests(model_eu_complete, listw = W_list, test = "all")
+##################################################################
+
+# on residuals from multiple regression
+moran.test(spatial_data_complete@data$res2, W_list) #same as line below
+lm.morantest(model_eu_complete, listw = W_list) #same as line above
+
+moran.plot(spatial_data_complete@data$res2, W_list)
+
+loc_mor <- localmoran(spatial_data_complete@data$res2, W_list, p.adjust.method = "bonferroni")
+spatial_data_complete@data$loc_mor_i_res2_w <- loc_mor[,1]
+spatial_data_complete@data$loc_mor_pv_res2_w <- loc_mor[,5]
+
+spplot(spatial_data_complete, zcol = "loc_mor_pv_res2_w", colorkey = TRUE, col.regions = pal(100), cuts = 99,
+       par.settings = list(axis.line = list(col =  'transparent')),
+       main = "LISA bonferroni p-value on res from mult reg W1")
+
+################################################################
+lm.LMtests(model_eu2_complete, listw = W_list, test = "all")
+##################################################################
+
 
 #W2
-moran.test(spatial_data_complete@data$res, W2_list)
+#on residuals from simple regression
+moran.test(spatial_data_complete@data$res, W2_list) #same as line below
+lm.morantest(model_eu_complete, listw = W2_list) #same as line above
+
 moran.plot(spatial_data_complete@data$res, W2_list)
 
 loc_mor2 <- localmoran(spatial_data_complete@data$res, W2_list, p.adjust.method = "bonferroni")
-spatial_data_complete@data$loc_mor_i2 <- loc_mor2[,1]
-spatial_data_complete@data$loc_mor_pv2 <- loc_mor2[,5]
+spatial_data_complete@data$loc_mor_i_res_w2 <- loc_mor2[,1]
+spatial_data_complete@data$loc_mor_pv_res_w2 <- loc_mor2[,5]
 
-spplot(spatial_data_complete, zcol = "loc_mor_pv2", colorkey = TRUE, col.regions = pal(100), cuts = 99,
+spplot(spatial_data_complete, zcol = "loc_mor_pv_res_w2", colorkey = TRUE, col.regions = pal(100), cuts = 99,
        par.settings = list(axis.line = list(col =  'transparent')),
-       main = "LISA bonferroni p-value")
+       main = "LISA bonferroni p-value on res from simp reg W2")
+
+################################################################
+lm.LMtests(model_eu_complete, listw = W2_list, test = "all")
+##################################################################
+
+
+#on residuals from multiple regression
+
+moran.test(spatial_data_complete@data$res2, W2_list)
+lm.morantest(model_eu2_complete, listw = W2_list) #same as line above
+
+moran.plot(spatial_data_complete@data$res2, W2_list)
+
+loc_mor2 <- localmoran(spatial_data_complete@data$res2, W2_list, p.adjust.method = "bonferroni")
+spatial_data_complete@data$loc_mor_i_res2_w2 <- loc_mor2[,1]
+spatial_data_complete@data$loc_mor_pv_res2_w2 <- loc_mor2[,5]
+
+spplot(spatial_data_complete, zcol = "loc_mor_pv_res2_w2", colorkey = TRUE, col.regions = pal(100), cuts = 99,
+       par.settings = list(axis.line = list(col =  'transparent')),
+       main = "LISA bonferroni p-value on res from mult reg W2")
+
+################################################################
+lm.LMtests(model_eu2_complete, listw = W2_list, test = "all")
+##################################################################
 
 
 
+########## SPATIAL MODELS ############
+# w1
+
+## pure SAR model
+
+model_pSAR <- spautolm(spatial_data_complete@data$household_income ~ 1, listw = W_list)
+summary(model_pSAR)
 
 
+## SAR (SLM) model
+# ML estimation
+model_SAR_ML <- lagsarlm(household_income ~ unemployment + hh_urb_per +
+                           res_dev + gva_growth + ht_perc, listw = W_list,
+                         data = spatial_data_complete)
+summary(model_SAR_ML)
+
+#2SLS estimation
+model_SAR_2SLS <- stsls(household_income ~ unemployment + hh_urb_per +
+                          res_dev + gva_growth + ht_perc, listw = W_list,
+                        data = spatial_data_complete)
+summary(model_SAR_2SLS)
+
+
+## SEM model
+# ML estimation
+model_SEM_ML <- errorsarlm(household_income ~ unemployment + hh_urb_per +
+                             res_dev + gva_growth + ht_perc, listw = W_list,
+                           data = spatial_data_complete)
+summary(model_SEM_ML)
+
+#SGLS estimation
+model_SEM_SGLS <- GMerrorsar(household_income ~ unemployment + hh_urb_per +
+                               res_dev + gva_growth + ht_perc, listw = W_list,
+                             data = spatial_data_complete)
+summary(model_SEM_SGLS)
+
+## SLX model
+model_SLX <- lmSLX(household_income ~ unemployment + hh_urb_per +
+                     res_dev + gva_growth + ht_perc, listw = W_list,
+                   data = spatial_data_complete)
+summary(model_SLX)
