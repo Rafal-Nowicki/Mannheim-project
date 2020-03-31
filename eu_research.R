@@ -14,6 +14,7 @@ library(tidyverse)
 library(ggcorrplot)
 library(latticeExtra)
 library(gridExtra)
+library(mice)
 
 `%notin%` <- Negate(`%in%`)
 
@@ -91,7 +92,7 @@ tech_emp_perc <- get_eurostat("htec_emp_reg2") %>%
   transmute(geo, ht_perc = values)
 
 
-### COMBINIG DATA ###
+### COMBINIG THE DATA ###
 
 df <- unemp %>%
   inner_join(hh_inc, by = "geo") %>%
@@ -171,7 +172,7 @@ ht_emp_perc_plot <- spplot(spatial_data, zcol = "ht_perc", colorkey = TRUE, col.
 
 
 grid.arrange(hh_plot, unempt_plot, res_dev_plot, tert_plot,
-             gva_grwth_plot, fert_plot, hh_urb_percent, ht_emp_perc_plot, ncol = 2)
+             gva_grwth_plot, fert_plot, hh_urb_percent_plot, ht_emp_perc_plot, ncol = 2)
 
 
 ### LINEAR MODELS ###
@@ -180,70 +181,84 @@ summary(model_eu)
 length(model_eu$residuals)
 
 model_eu2 <- lm(data = spatial_data@data, household_income ~ unemployment + hh_urb_per +
-                  res_dev + gva_growth + ht_perc, na.action = na.exclude)
+                  res_dev + gva_growth + ht_perc)
 summary(model_eu2)
 length(model_eu2$residuals)
-
-
 
 
 #### NAs imputation
-library(mice)
 df_imputed <- mice(df[,-1], m=1, maxit = 50, method = 'pmm', seed = 500)
 df_complete <- complete(df_imputed,1) %>%
   cbind(geo = df$geo)
-####
 
-
-### LINEAR MODELS ###
-
-
+### LINEAR MODELS on completed data ###
 spatial_data_complete <- merge(y = df_complete, x = map, by.y = "geo", by.x = "NUTS_ID")
 
-model_eu <- lm(data = spatial_data_complete@data, household_income ~ unemployment)
-summary(model_eu)
+model_eu_complete <- lm(data = spatial_data_complete@data, household_income ~ unemployment)
+summary(model_eu_complete)
 length(model_eu$residuals)
 
-model_eu2 <- lm(data = spatial_data_complete@data, household_income ~ unemployment + hh_urb_per +
+model_eu2_complete <- lm(data = spatial_data_complete@data, household_income ~ unemployment + hh_urb_per +
                   res_dev + gva_growth + ht_perc, na.action = na.exclude)
-summary(model_eu2)
+summary(model_eu2_complete)
 length(model_eu2$residuals)
 
+## Residuals distribution ##
 
-
-
-
-
-
-
-spatial_data_complete$res <- model_eu2$residuals
+spatial_data_complete$res <- model_eu_complete$residuals
+spatial_data_complete$res2 <- model_eu2_complete$residuals
 
 res_plot <- spplot(spatial_data_complete, zcol = "res", colorkey = TRUE, col.regions = pal(100), cuts = 99,
                    par.settings = list(axis.line = list(col =  'transparent')),
-                   main = "Residuals from regression")
+                   main = "Residuals from simple regression")
 
+res_plot2 <- spplot(spatial_data_complete, zcol = "res2", colorkey = TRUE, col.regions = pal(100), cuts = 99,
+                   par.settings = list(axis.line = list(col =  'transparent')),
+                   main = "Residuals from multiple regression")
 
 ### Weight matrices ###
 centroids <- coordinates(spatial_data_complete)
 
+#first order neighbourhood
 cont <- poly2nb(spatial_data_complete, queen = T)
 W_list <- nb2listw(cont, style = "W", zero.policy = T) # row normalization
 W <- listw2mat(W_list)
 plot.nb(cont, centroids, pch = 16, col = "grey")
 
+
+#second order neighbourhood
+cont2 <- nblag_cumul(nblag(cont, maxlag = 2))
+W2_list <- nb2listw(cont2, style = "W", zero.policy = T) # row normalization
+W2 <- listw2mat(W2_list)
+plot.nb(cont2, centroids, pch = 16, col = "grey")
+
 # Spatial dependency test
 
+#W1
 moran.test(spatial_data_complete@data$res, W_list)
 moran.plot(spatial_data_complete@data$res, W_list)
-
-
 
 loc_mor <- localmoran(spatial_data_complete@data$res, W_list, p.adjust.method = "bonferroni")
 spatial_data_complete@data$loc_mor_i <- loc_mor[,1]
 spatial_data_complete@data$loc_mor_pv <- loc_mor[,5]
 
-
 spplot(spatial_data_complete, zcol = "loc_mor_pv", colorkey = TRUE, col.regions = pal(100), cuts = 99,
        par.settings = list(axis.line = list(col =  'transparent')),
        main = "LISA bonferroni p-value")
+
+#W2
+moran.test(spatial_data_complete@data$res, W2_list)
+moran.plot(spatial_data_complete@data$res, W2_list)
+
+loc_mor2 <- localmoran(spatial_data_complete@data$res, W2_list, p.adjust.method = "bonferroni")
+spatial_data_complete@data$loc_mor_i2 <- loc_mor2[,1]
+spatial_data_complete@data$loc_mor_pv2 <- loc_mor2[,5]
+
+spplot(spatial_data_complete, zcol = "loc_mor_pv2", colorkey = TRUE, col.regions = pal(100), cuts = 99,
+       par.settings = list(axis.line = list(col =  'transparent')),
+       main = "LISA bonferroni p-value")
+
+
+
+
 
