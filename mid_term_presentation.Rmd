@@ -1,0 +1,112 @@
+---
+title: "Fundamentals of computing and data display"
+author: "Rafal Nowicki"
+date: "1 04 2020"
+output: ioslides_presentation
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Household disposable income determinants in Western Europe - NUTS 2 level
+
+- Which factors drive household income the most?
+- Is there some kind of spatial dependency and if so how can we explain it?
+- Assuming there is a huge investment in Brandenburg region resulting in a certain decrease of unemployment rate are we able to predict the extend of impact on household income for the neighbouring regions?
+
+## Data collection (1/2)
+To conduct the analysis we need some data on socio-economical variables for the statistical unitis in Europe. The most recent and reliable data in that matter is provided by **Eurostat** so we are going to use its API...
+
+![](https://ec.europa.eu/eurostat/documents/6997343/6999619/REST_REQUEST_2_1.png/d0a400ad-a8cb-4b4a-b9ce-15ae70334665?t=1521113967130){width=750px, height=270px}
+
+
+## Data collection (2/2)
+... with R package **eurostat**
+```{r echo =TRUE, include = T, message = FALSE, warning=FALSE}
+library(eurostat)
+library(tidyverse)
+
+search_eurostat("NUTS 2") %>%
+  filter(`data end` >= 2017) %>%
+  arrange(desc(`last update of data`))%>%
+  select(title)%>%
+  head(3)
+
+```
+
+
+## How does it look like (1/2)
+
+```{r, include=TRUE, echo=TRUE, message=FALSE}
+library(eurostat)
+
+get_eurostat("nama_10r_2hhinc") %>%
+  subset(grepl("(DE|AT|FR|NL|BE)([0-9]|[A-Z]){2}", geo)) %>%
+  filter(time == "2017-01-01", unit == "PPS_HAB", na_item == "B6N")%>%
+  head(7)
+```
+
+
+
+
+## How does it look like (2/2)
+
+```{r, message = FALSE, warning=FALSE}
+library(eurostat)
+library(rgdal)
+library(sp)
+library(spdep)
+library(tidyverse)
+library(ggcorrplot)
+library(latticeExtra)
+library(gridExtra)
+
+`%notin%` <- Negate(`%in%`)
+
+
+#Unemployment in 20-64 age group
+unemp <- get_eurostat("lfst_r_lfu3rt") %>%
+  subset(grepl("(DE|AT|FR|NL|BE)([0-9]|[A-Z]){2}", geo)) %>%
+  filter(time == "2018-01-01", unit == "PC", sex == "T", age == "Y20-64") %>%
+  transmute(geo, unemployment = values)
+
+#Disposable income per capita PPS
+hh_inc <- get_eurostat("nama_10r_2hhinc") %>%
+  subset(grepl("(DE|AT|FR|NL|BE)([0-9]|[A-Z]){2}", geo)) %>%
+  filter(time == "2017-01-01", unit == "PPS_HAB", na_item == "B6N") %>%
+  transmute(geo, household_income = values)
+
+df <- unemp %>%
+  inner_join(hh_inc, by = "geo")
+
+map <- get_eurostat_geospatial(output_class = "spdf",
+                               resolution = "60", nuts_level = "2")
+
+
+map <- map[map@data$CNTR_CODE %in% 
+             c("DE","NL","AT","BE", "FR"), ] #choosing countries of interest (WUE)
+
+map <- map[map@data$id %notin% 
+             c("FRY1", "FRY2", "FRY3", "FRY4", "FRY5", "FRM0"),] #excluding french islands
+spatial_data <- merge(y = df, x = map, by.y = "geo", by.x = "NUTS_ID")
+pal <- colorRampPalette(c("red","white" ,"green"))
+
+
+
+hh_plot <- spplot(spatial_data, zcol = "household_income", colorkey = TRUE, col.regions = pal(100), cuts = 99,
+                  par.settings = list(axis.line = list(col =  'transparent')),
+                  main = "Disposable household income in PPS") +
+  layer_(sp.polygons(spatial_data, fill='grey'))
+
+
+unempt_plot <- spplot(spatial_data, zcol = "unemployment", colorkey = TRUE, col.regions = pal(100), cuts = 99,
+                      par.settings = list(axis.line = list(col =  'transparent')),
+                      main = "Unemployment in age group 20-64") +
+  layer_(sp.polygons(spatial_data, fill='grey'))
+
+
+hh_plot
+```
+
