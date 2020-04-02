@@ -15,6 +15,7 @@ library(ggcorrplot)
 library(latticeExtra)
 library(gridExtra)
 library(mice)
+library(latex2exp)
 
 `%notin%` <- Negate(`%in%`)
 
@@ -198,7 +199,7 @@ spatial_data_complete <- merge(y = df_complete, x = map, by.y = "geo", by.x = "N
 #SIMPLE REGRESSION
 model_eu_complete <- lm(data = spatial_data_complete@data, household_income ~ unemployment)
 summary(model_eu_complete)
-length(model_eu$residuals)
+length(model_eu_complete$residuals)
 
 
 #MULTIPLE REGRESSION
@@ -222,6 +223,7 @@ res_plot2 <- spplot(spatial_data_complete, zcol = "res2", colorkey = TRUE, col.r
 
 grid.arrange(res_plot, res_plot2)
 
+
 ### Weight matrices ###
 centroids <- coordinates(spatial_data_complete)
 
@@ -238,6 +240,8 @@ W2_list <- nb2listw(cont2, style = "W", zero.policy = T) # row normalization
 W2 <- listw2mat(W2_list)
 plot.nb(cont2, centroids, pch = 16, col = "grey")
 
+
+############################
 # Spatial dependency test
 
 #W1
@@ -320,6 +324,47 @@ lm.LMtests(model_eu2_complete, listw = W2_list, test = "all")
 
 
 
+
+############################
+##########################
+spatial_data_complete$res_lagged <-lag.listw(x = W_list, var = spatial_data_complete$res)
+
+plot(spatial_data_complete@data$res, spatial_data_complete$res_lagged)
+
+
+moran_plot_data <- data.frame(spatial_data_complete@data$res, spatial_data_complete$res_lagged, 
+                              spatial_data_complete@data$loc_mor_pv_res_w)
+
+colnames(moran_plot_data) <- c("res", "res_lagged", "p_val")
+
+moran_plot_data$sign <- ifelse(moran_plot_data$p_val<=0.1,1,0)
+
+
+
+moran_plot_data$sign_col <- ifelse(moran_plot_data$sign == 1 & 
+                                     moran_plot_data$res<0 & moran_plot_data$res_lagged<0,
+                                   "significant low-low", "unsignificant")
+
+moran_plot_data$sign_col <- ifelse(moran_plot_data$sign == 1 & 
+                                     moran_plot_data$res>0 & moran_plot_data$res_lagged>0,
+                                   "significant high-high", moran_plot_data$sign_col)
+
+
+morans_plot_res <- ggplot(data = moran_plot_data, aes(res, res_lagged) )+
+  geom_point(aes(colour = factor(sign_col)),size = 1.5)+
+  stat_smooth(method = "lm", geom = "line", col = "orange", alpha = 0.4, size = 2)+
+  scale_color_manual(values = c('red','blue', "grey")) +
+  geom_hline(yintercept=0, color = "black", linetype = "dashed")+
+  geom_vline(xintercept=0, color = "black", linetype = "dashed")+
+  xlab("Residual value") + 
+  ylab("Spatially lagged residual value")+
+  theme_classic()+
+  theme(legend.position = c(0.15,0.8))+
+  labs(col = "cluster significance (LISA)")+
+  ggtitle(TeX("Moran's plot for residuals from regression $income = \\beta unemp + \\epsilon$ (Western Europe NUTS 2 regions, 2018)"))
+
+morans_plot_res
+##########################################
 ########## SPATIAL MODELS ############
 # w1
 
@@ -361,3 +406,4 @@ model_SLX <- lmSLX(household_income ~ unemployment + hh_urb_per +
                      res_dev + gva_growth + ht_perc, listw = W_list,
                    data = spatial_data_complete)
 summary(model_SLX)
+
