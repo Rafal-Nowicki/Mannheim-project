@@ -10,20 +10,51 @@ output: ioslides_presentation
 knitr::opts_chunk$set(echo = FALSE)
 ```
 
-## Household disposable income determinants in Western Europe - NUTS 2 level
+##
+```{r, message = FALSE, warning=FALSE, echo = F}
+library("tm")
+library("wordcloud")
+library("RColorBrewer")
+library(tidyverse)
+
+words <- c("Mannheim", "computing", "data", "API", "spatial", "project", "web", "midterm",
+           "econometrics", "Eurostat", "NUTS2", "social", "analysis", "Europe", "Western",
+           "statistics", "economic", "Germany", "effect", "prediction", "gathering",
+           "model", "relationship", "estimation", " autocorrelation", "visualization",                      "methods","neighbours", "R Markdown", "tidyverse", "wrangling", "impact",                       "dependency","distribution", "GitHub", "unemployment", "income")
+
+
+words_count <- rev(seq(from = 1,to = length(words), by = 1))
+bonus <- rnorm(length(words_count),0,5)
+fizzy_words <- words_count + bonus
+names(fizzy_words) <- words
+words_set <- data.frame(word = names(fizzy_words),freq= fizzy_words)
+
+
+
+wordcloud(words = words_set$word, freq = words_set$freq, min.freq = 1,
+                  max.words=100, random.order=FALSE, rot.per=0.35, 
+                  colors=brewer.pal(8, "Dark2"))
+
+```
+
+
+
+
+## Household income determinants in Western Europe - NUTS 2 level
 
 - Which factors drive household income the most?
+- What are the signs of coefficients and are they in-line with the theory?
 - Is there some kind of spatial dependency and if so how can we explain it?
 - Assuming there is a huge investment in Brandenburg region resulting in a certain decrease of unemployment rate are we able to predict the extend of impact on household income for the neighbouring regions?
 
 ## Data collection (1/2)
-To conduct the analysis we need some data on socio-economical variables for the statistical unitis in Europe. The most recent and reliable data in that matter is provided by **Eurostat** so we are going to use its API...
+To conduct the analysis we need some data on socio-economic variables for the statistical unitis in Europe. The most recent and reliable data in that matter is provided by **Eurostat** so we are going to use its API...
 
 ![](https://ec.europa.eu/eurostat/documents/6997343/6999619/REST_REQUEST_2_1.png/d0a400ad-a8cb-4b4a-b9ce-15ae70334665?t=1521113967130){width=750px, height=270px}
 
 
 ## Data collection (2/2)
-... with R package **eurostat**
+... with R package **eurostat**!
 ```{r echo =TRUE, include = T, message = FALSE, warning=FALSE}
 library(eurostat)
 library(tidyverse)
@@ -66,17 +97,17 @@ library(gridExtra)
 `%notin%` <- Negate(`%in%`)
 
 
-#Unemployment in 20-64 age group
-unemp <- get_eurostat("lfst_r_lfu3rt") %>%
-  subset(grepl("(DE|AT|FR|NL|BE)([0-9]|[A-Z]){2}", geo)) %>%
-  filter(time == "2018-01-01", unit == "PC", sex == "T", age == "Y20-64") %>%
-  transmute(geo, unemployment = values)
-
 #Disposable income per capita PPS
 hh_inc <- get_eurostat("nama_10r_2hhinc") %>%
   subset(grepl("(DE|AT|FR|NL|BE)([0-9]|[A-Z]){2}", geo)) %>%
   filter(time == "2017-01-01", unit == "PPS_HAB", na_item == "B6N") %>%
   transmute(geo, household_income = values)
+
+unemp <- get_eurostat("lfst_r_lfu3rt") %>%
+  subset(grepl("(DE|AT|FR|NL|BE)([0-9]|[A-Z]){2}", geo)) %>%
+  filter(time == "2018-01-01", unit == "PC", sex == "T", age == "Y20-64") %>%
+  transmute(geo, unemployment = values)
+
 
 df <- unemp %>%
   inner_join(hh_inc, by = "geo")
@@ -109,4 +140,18 @@ unempt_plot <- spplot(spatial_data, zcol = "unemployment", colorkey = TRUE, col.
 
 hh_plot
 ```
+
+## Methods (1/2)
+The analysis will be conducted with tools of spatial econometrics, i.e.
+
+1. We regress households income on several socio-economic variables.
+2. Then we look for patterns in the spatial distribution of residuals.
+3. If spatial dependency is present (spoiler alert: **it is!**) we are going to propose some models of single-source as well as dual-source spatial processes.
+4. Then we choose the best one and confront it with the theory.
+5. In the end we will conduct a simulation to see how the system reacts for a given impuls.
+
+
+## Methods (2/2)
+
+
 
