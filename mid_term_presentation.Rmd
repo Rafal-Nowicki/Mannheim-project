@@ -270,4 +270,4 @@ morans_plot_res <- ggplot(data = moran_plot_data, aes(res, res_lagged) )+
 morans_plot_res
 ```
 
-
+### Danke für Ihre Aufmerksamkeit!
