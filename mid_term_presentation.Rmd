@@ -68,7 +68,7 @@ search_eurostat("NUTS 2") %>%
 ```
 
 
-## How does it look like (1/2)
+## Funcionality overview (1/2)
 
 ```{r, include=TRUE, echo=TRUE, message=FALSE}
 library(eurostat)
@@ -82,7 +82,7 @@ get_eurostat("nama_10r_2hhinc") %>%
 
 
 
-## How does it look like (2/2)
+## Funcionality overwiev (2/2)
 
 ```{r, message = FALSE, warning=FALSE}
 library(eurostat)
