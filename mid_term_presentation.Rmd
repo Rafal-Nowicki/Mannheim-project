@@ -94,7 +94,7 @@ get_eurostat("nama_10r_2hhinc") %>%
 
 
 
-## Funcionality overwiev (2/2)
+## Funcionality overview (2/2)
 
 ```{r, message = FALSE, warning=FALSE}
 library(eurostat)
