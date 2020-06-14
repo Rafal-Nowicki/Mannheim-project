@@ -1,0 +1,542 @@
+---
+title: "Households' income across the Western Europe"
+author: "Rafal Nowicki"
+date: "14 06 2020"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, message = FALSE, echo = FALSE}
+library(eurostat)
+library(tidyverse)
+library(kableExtra)
+library(sp)
+library(gridExtra)
+library(grid)
+library(latticeExtra)
+library(spdep)
+library(mice)
+
+`%notin%` <- Negate(`%in%`)
+```
+
+
+# Preliminary
+
+Regional variability of disposable households' income (expressed in PPS per inhabitant)  exceeded 15% in Western Europe in 2017 for NUTS 2 level and was probably even higher for more detailed levels of analysis such as NUTS 3. That fact raises some important questions. 
+
+The most interesting one is of course why are some regions rich whereas others are considered to be poor. The answer to this question may seem very complex and in fact it is but what we can do is to try to make some data-driven statements about this phenomenon. Our strategy in that matter will be to build a regression model incorporating some socio-economic variables that account for at least part of this variability. In that way we will be able to explain a bit of those inequalities and at the same time find out the magnitude of impact of some economic indicators as unemployment rate or the social ones as percentage of people with degree.
+
+Next question concerns strictly the distribution of disposable households' income in space. As we metioned above income is not evenly distributed across the Western Europe regions but having controlled for the most important socio-economic features are there any spatial patterns left or those variables are sufficient to explain it? To examine that we will use some spatial econometrics techniques as spatial regressions and indicators of spatial dependency.
+
+The last issue is about the possibility of utilizing the concepts mentioned above. As it is getting extremely important to be able to predict the future in order to make reasonable decisions are we able to make some predictions regarding the change of income level in neighboring regions as a response to some kinds of investments? We will try to figure that out using simulations from models that behave the best.
+
+
+# Data
+
+Data used in this research comes entirely from Eurostat database from 2018. R package `eurostat` developed by Biecek et al. was used to access Eurostat API in order to collect necessary variables. In the table below we show all variables used in this study with explanations and units. One important note is due to lack of data for some regions we use data from year 2017 for some variables.
+
+```{r, cache = TRUE, echo = FALSE, message = FALSE}
+#Unemployment in 20-64 age group
+unemp <- get_eurostat("lfst_r_lfu3rt") %>%
+  subset(grepl("(DE|AT|FR|NL|BE)([0-9]|[A-Z]){2}", geo)) %>%
+  filter(time == "2018-01-01", unit == "PC", sex == "T", age == "Y20-64") %>%
+  transmute(geo, unemployment = values)
+
+#Disposable income per capita PPS
+hh_inc <- get_eurostat("nama_10r_2hhinc") %>%
+  subset(grepl("(DE|AT|FR|NL|BE)([0-9]|[A-Z]){2}", geo)) %>%
+  filter(time == "2017-01-01", unit == "PPS_HAB", na_item == "B6N") %>%
+  transmute(geo, household_income = values)
+
+#Gross Value Added Real Growth Rate
+gva_grwth <- get_eurostat("nama_10r_2gvagr") %>%
+  subset(grepl("(DE|AT|FR|NL|BE)([0-9]|[A-Z]){2}", geo)) %>%
+  filter(time == "2018-01-01", unit == "PCH_PRE") %>%
+  transmute(geo, gva_growth = values)
+
+# Research and Developement Expenditures (euro per inhabitant)
+res_dev <- get_eurostat("rd_e_gerdreg") %>%
+  subset(grepl("(DE|AT|FR|NL|BE)([0-9]|[A-Z]){2}", geo)) %>%
+  filter(time == "2017-01-01", sectperf == "TOTAL", unit == "EUR_HAB") %>%
+  transmute(geo, res_dev = values)
+
+# Percent of people aged 20-64 with tertiary degree ISCED 5-8
+tert <- get_eurostat("edat_lfse_04") %>%
+  subset(grepl("(DE|AT|FR|NL|BE)([0-9]|[A-Z]){2}", geo)) %>%
+  filter(time == "2018-01-01", sex == "T", isced11 == "ED5-8") %>%
+  transmute(geo, tert = values)
+
+# Total fertility rate
+fert <- get_eurostat("demo_r_frate2") %>%
+  subset(grepl("(DE|AT|FR|NL|BE)([0-9]|[A-Z]){2}", geo)) %>%
+  filter(time == "2018-01-01", age == "TOTAL", unit == "NR") %>%
+  transmute(geo, fert = values)
+
+# Total number of households
+hh_num_t <- get_eurostat("lfst_r_lfsd2hh") %>%
+  subset(grepl("(DE|AT|FR|NL|BE)([0-9]|[A-Z]){2}", geo)) %>%
+  filter(time == "2018-01-01", deg_urb == "TOTAL") %>%
+  transmute(geo, hh_num_t = values)
+
+# Number of households in the cities
+hh_num_cities <- get_eurostat("lfst_r_lfsd2hh") %>%
+  subset(grepl("(DE|AT|FR|NL|BE)([0-9]|[A-Z]){2}", geo)) %>%
+  filter(time == "2018-01-01", deg_urb == "DEG1") %>%
+  transmute(geo, hh_num_c = values)
+
+# Number of households in the towns and suburbs
+hh_num_suburbs <- get_eurostat("lfst_r_lfsd2hh") %>%
+  subset(grepl("(DE|AT|FR|NL|BE)([0-9]|[A-Z]){2}", geo)) %>%
+  filter(time == "2018-01-01", deg_urb == "DEG2") %>%
+  transmute(geo, hh_num_s = values)
+
+# Percent of households in the cieties, towns and suburbs
+hh_urb_percent <- hh_num_t %>%
+  inner_join(hh_num_cities, by = "geo") %>%
+  inner_join(hh_num_suburbs, by = "geo") %>%
+  transmute(geo,hh_urb_per = (hh_num_c + hh_num_s)/hh_num_t*100)
+
+#Percent of employees employed in high-tech and knowledge intesive sectors (by NACE rev.2)
+tech_emp_perc <- get_eurostat("htec_emp_reg2") %>%
+  subset(grepl("(DE|AT|FR|NL|BE)([0-9]|[A-Z]){2}", geo)) %>%
+  filter(time == "2018-01-01", sex == "T", unit == "PC_EMP", nace_r2 == "HTC") %>%
+  transmute(geo, ht_perc = values)
+
+
+df <- unemp %>%
+  inner_join(hh_inc, by = "geo") %>%
+  left_join(gva_grwth, by = "geo") %>%
+  left_join(res_dev, by = "geo") %>%
+  left_join(tert, by = "geo") %>% 
+  left_join(fert, by = "geo") %>%
+  left_join(hh_urb_percent, by = "geo") %>%
+  left_join(tech_emp_perc, by = "geo")
+
+```
+
+
+```{r, echo = FALSE}
+var_names <- colnames(df)[-1]
+
+var_exp <- c("unemployment rate", "disposable households' income per inhabitant", "gross value added real growth", "research and development expenditure per inhabitant", "people aged 20-64 with tertiary degree", "fertility rate", "households in the cities, towns and suburbs", "people employed in high-tech and knowledge intesive sectors (by NACE rev.2)")
+
+unit <- c("percent", "Euro PPS", "percent", "Euro", "percent", "percent", "percent", "percent")
+
+year <- rep(2018,8)
+year[c(2,4)] <- rep(2017,2)
+
+
+vars <- data.frame(var_names, var_exp, unit, year)
+colnames(vars) <- c("Variable", "Explanation", "Unit", "Year")
+
+kable(vars) %>%
+  kable_styling(fixed_thead = T, font_size = 11.5)
+```
+
+Next we show spatial disttribution of features of interest in form of choropleth. Due to lack of the data about R&D expenditures and Gross Value Added in France we will be forced to drop those variables from further analysis although big hopes were placed in their discriminatory power.
+
+As there are still some single regions in Austria not having all data we will input those values using PMM algorithm as we want to have residuals for all regions calculated.
+
+```{r, echo = FALSE, message = FALSE}
+# MAP PREPARATION #
+
+map <- get_eurostat_geospatial(output_class = "spdf",
+                               resolution = "60", nuts_level = "2")
+
+
+map <- map[map@data$CNTR_CODE %in% 
+             c("DE","NL","AT","BE", "FR"), ] #choosing countries of interest (WUE)
+
+map <- map[map@data$id %notin% 
+             c("FRY1", "FRY2", "FRY3", "FRY4", "FRY5", "FRM0"),] #excluding french islands
+#plot(map)
+
+# MERGING DATA WITH THE MAP
+spatial_data <- merge(y = df, x = map, by.y = "geo", by.x = "NUTS_ID")
+```
+
+
+
+```{r, echo = FALSE, fig.align = "center", fig.width = 13, fig.height = 17, cache = TRUE}
+# SOME PLOTS
+pal <- colorRampPalette(c("red","white" ,"green"))
+
+
+hh_plot <- spplot(spatial_data, zcol = "household_income", colorkey = TRUE, col.regions = pal(100), cuts = 99,
+                  par.settings = list(axis.line = list(col =  'transparent')),
+                  main = "Disposable household income in PPS") +
+  layer_(sp.polygons(spatial_data, fill='grey'))
+
+
+unempt_plot <- spplot(spatial_data, zcol = "unemployment", colorkey = TRUE, col.regions = pal(100), cuts = 99,
+                      par.settings = list(axis.line = list(col =  'transparent')),
+                      main = "Unemployment in age group 20-64") +
+  layer_(sp.polygons(spatial_data, fill='grey'))
+
+
+res_dev_plot <- spplot(spatial_data, zcol = "res_dev", colorkey = TRUE, col.regions = pal(100), cuts = 99,
+                       par.settings = list(axis.line = list(col =  'transparent')),
+                       main = "R&D expenditures per inhabitant") +
+  layer_(sp.polygons(spatial_data, fill='grey'))
+
+tert_plot <- spplot(spatial_data, zcol = "tert", colorkey = TRUE, col.regions = pal(100), cuts = 99,
+                    par.settings = list(axis.line = list(col =  'transparent')),
+                    main = "tertiary attachement in age group 20-64") +
+  layer_(sp.polygons(spatial_data, fill='grey'))
+
+
+gva_grwth_plot <- spplot(spatial_data, zcol = "gva_growth", colorkey = TRUE, col.regions = pal(100), cuts = 99,
+                         par.settings = list(axis.line = list(col =  'transparent')),
+                         main = "GVA real growth rate") +
+  layer_(sp.polygons(spatial_data, fill='grey'))
+
+
+fert_plot <- spplot(spatial_data, zcol = "fert", colorkey = TRUE, col.regions = pal(100), cuts = 99,
+                    par.settings = list(axis.line = list(col =  'transparent')),
+                    main = "total fertility rate") +
+  layer_(sp.polygons(spatial_data, fill='grey'))
+
+
+hh_urb_percent_plot <- spplot(spatial_data, zcol = "hh_urb_per", colorkey = TRUE, col.regions = pal(100), cuts = 99,
+                              par.settings = list(axis.line = list(col =  'transparent')),
+                              main = "percent of households in the urban areas") +
+  layer_(sp.polygons(spatial_data, fill='grey'))
+
+ht_emp_perc_plot <- spplot(spatial_data, zcol = "ht_perc", colorkey = TRUE, col.regions = pal(100), cuts = 99,
+                           par.settings = list(axis.line = list(col =  'transparent')),
+                           main = "percent of employees in high-tech industries") +
+  layer_(sp.polygons(spatial_data, fill='grey'))
+
+
+grid.arrange(hh_plot, unempt_plot, res_dev_plot, tert_plot,
+             gva_grwth_plot, fert_plot, hh_urb_percent_plot, ht_emp_perc_plot, ncol = 2,
+             top = textGrob("Variables of interest space distribution",gp = gpar(fontsize = 18)))
+
+```
+
+
+# Methods
+
+In this section we will briefly present the methods implementd in the analysis.
+
+## Linear model
+
+The benchmark model we will use is linear regression model. In this case not only coefficients are of interest for us but also the residuals. We want to investigate whether they exhibit some kind of spatial patterns. If not, there would be no need of spatial modelling at all and that would basically mean that spatial links in $y$ are implicitly captured through the spatial autocorrelation of regressors included in $X$. 
+
+This model looks as following:
+
+$$y = \beta_0 + \beta_1 x_{1} + ... + \beta_n x_{n} + \varepsilon$$
+
+## Spatial models
+
+Next we will move to spatial models. For that purpose first we have to propse some contiguity matrix (the so called $W$ matrix). For the sake of sensitivity analysis we will go with two different $W$ matrices, i.e one depicting first order neighbourhood and the second one second order neighbourhood situation (left and right graph below respectively).
+
+
+```{r, echo = FALSE, fig.align = "center", fig.width = 13, fig.height = 5}
+### Weight matrices ###
+centroids <- coordinates(spatial_data)
+
+#first order neighbourhood
+cont <- poly2nb(spatial_data, queen = T)
+W_list <- nb2listw(cont, style = "W", zero.policy = T) # row normalization
+W <- listw2mat(W_list)
+
+
+#second order neighbourhood
+cont2 <- nblag_cumul(nblag(cont, maxlag = 2))
+W2_list <- nb2listw(cont2, style = "W", zero.policy = T) # row normalization
+W2 <- listw2mat(W2_list)
+
+par(mfrow=c(1,2))
+
+plot.nb(cont, centroids, pch = 16, col = "grey")
+
+plot.nb(cont2, centroids, pch = 16, col = "grey")
+```
+
+### Single Source Spatial models
+
+All four models presented below are characterized just by one source of spatial process.
+
+#### Pure Spatial Autocorrelation model
+The simpliest spatial model we can come up with is pSAR model. We will use it rather to quanitfy spatial dependency than to actually model something. 
+
+Its functional form looks as follows:
+
+$$y = \rho Wy + \varepsilon,$$
+where $\rho$ is spatial dependency parameter and $W$ represents one of spatial weights matrices presented above.
+
+
+#### Spatial Autocorrelation model
+
+The next model we will estimate is SAR model. It is appropriate when $X$ in region A has impact on $y$ in this region and at the same time $y$ in region A impacts $y$ in region B. In other words we do not assume spatial clustering of the causes, but spatial interactions in outcomes.
+
+$$y=\rho \boldsymbol{W} y+\boldsymbol{X} \beta+\varepsilon$$
+
+#### Spatial Error model
+
+We typically use SEM model when some kind of shock has impact both on region A and its neighbours.
+
+$$\begin{array}{l}
+y=\boldsymbol{X} \beta+\varepsilon \\
+\varepsilon=\lambda \boldsymbol{W} \varepsilon+u
+\end{array}$$
+
+
+
+#### Spatial Lag model
+
+The so called SLX model is introduced when $X$ in region A has direct impact on neighbouring $y$.
+
+$$y=\boldsymbol{X} \beta+\boldsymbol{W} \boldsymbol{X} \theta+\varepsilon$$
+
+
+### Dual Source Spatial models
+
+The next three models have two sources of spatial process. We can think of them as a combinations of the models presented above.
+
+#### SARAR = SAR + SEM
+
+$$\begin{array}{c}
+y=\rho \boldsymbol{W} y+\boldsymbol{X} \beta+\varepsilon \\
+\varepsilon=\lambda \boldsymbol{W} \varepsilon+u
+\end{array}$$
+
+#### SDM (Durbin Model) = SLX + SAR
+
+$$y=
+\rho W y + \boldsymbol{X} \beta+\boldsymbol{W} \boldsymbol{X} \theta+\varepsilon$$
+
+
+#### SDEM = SLX + SEM
+
+$$\begin{array}{c}
+y=\boldsymbol{X} \beta+\boldsymbol{W} \boldsymbol{X} \theta+\varepsilon \\
+\varepsilon=\lambda \boldsymbol{W} \varepsilon+u
+\end{array}$$
+
+# Results
+Let's estimate two linear models. The first one is the simple regression model with only unemployment as regressor and the second one is multiple regression model with variables unemployment, urbanization, tertiary education and high-tech employment incorporated. Having the results let's examine their residuals distributions.
+```{r, echo = FALSE, message = FALSE, warning = FALSE, include = FALSE, cache = TRUE}
+#### NAs imputation
+df_imputed <- mice(df[,-1], m=1, maxit = 50, method = 'pmm', seed = 500)
+
+df_complete <- complete(df_imputed,1) %>%
+  cbind(geo = df$geo)
+```
+
+```{r, echo = FALSE, message = FALSE, include = FALSE}
+### LINEAR MODELS on completed data ###
+spatial_data_complete <- merge(y = df_complete, x = map, by.y = "geo", by.x = "NUTS_ID")
+
+
+#SIMPLE REGRESSION
+model_eu_complete <- lm(data = spatial_data_complete@data, household_income ~ unemployment)
+summary(model_eu_complete)
+#length(model_eu_complete$residuals)
+
+
+#MULTIPLE REGRESSION
+model_eu2_complete <- lm(data = spatial_data_complete@data, household_income ~ unemployment + hh_urb_per + tert + ht_perc)
+summary(model_eu2_complete)
+#length(model_eu2_complete$residuals)
+```
+
+
+
+```{r, echo = FALSE, fig.align = "center", fig.width = 13}
+## Residuals spatial distribution ##
+
+spatial_data_complete$res <- model_eu_complete$residuals
+spatial_data_complete$res2 <- model_eu2_complete$residuals
+
+res_plot <- spplot(spatial_data_complete, zcol = "res", colorkey = TRUE, col.regions = pal(100), cuts = 99,
+                   par.settings = list(axis.line = list(col =  'transparent')),
+                   main = "Residuals from simple regression")
+
+res_plot2 <- spplot(spatial_data_complete, zcol = "res2", colorkey = TRUE, col.regions = pal(100), cuts = 99,
+                   par.settings = list(axis.line = list(col =  'transparent')),
+                   main = "Residuals from multiple regression")
+
+grid.arrange(res_plot, res_plot2, ncol = 2)
+
+```
+
+What we can see in both graphs above is that there is indeed a spatial pattern in the residuals distribution but just to be sure we should support this statement with statistical procedure called Moran's I test. As presented in table below for both models and both $W$ matrices p-value is nearly 0 so we can reject hypothesis about spatial independency in all cases.
+
+```{r, echo = FALSE}
+meuW1 <- lm.morantest(model_eu_complete, listw = W_list) #same as line above
+meuW2 <- lm.morantest(model_eu_complete, listw = W2_list) #same as line above
+meu2W1 <- lm.morantest(model_eu2_complete, listw = W_list) #same as line above
+meu2W2 <- lm.morantest(model_eu2_complete, listw = W2_list) #same as line above
+
+p.value <- c(meuW1$p.value, meuW2$p.value, meu2W1$p.value, meu2W2$p.value)
+model <- c("Simple W1", "Simple W2", "Multi W1", "Multi W2")
+
+p.val.mod <- t(data.frame(model,p.value))
+
+kable(p.val.mod) %>%
+    kable_styling(fixed_thead = T, font_size = 11.5)
+
+```
+
+Let's focus now on the multiple regression models as they are of more relevance for us now. Below on the left hand side we present Moran's plot for the residuals from multiple regression, i.e residuals vs their spatially lagged values (weighted average across the neighbours). The Moran's I statistic is simply the slope of such derived curve.
+
+To find out which regions drive Moran's I statistic the most we can utilize the so called Local Indicators of Spatial Association (LISA) and their p - values (with Bonferonni correction as it's multiple testing). They are presented below on the right hand side.
+
+```{r,fig.align = "center", fig.width = 14, fig.height = 8, cache = TRUE, echo = FALSE, warning = FALSE, message = FALSE}
+loc_mor <- localmoran(spatial_data_complete@data$res2, W_list, p.adjust.method = "bonferroni")
+
+spatial_data_complete@data$loc_mor_i_res_w <- loc_mor[,1]
+spatial_data_complete@data$loc_mor_pv_res_w <- loc_mor[,5]
+
+
+
+spatial_data_complete$res_lagged <-lag.listw(x = W_list, var = spatial_data_complete$res2)
+
+moran_plot_data <- data.frame(spatial_data_complete@data$res2, spatial_data_complete$res_lagged, 
+                              spatial_data_complete@data$loc_mor_pv_res_w)
+
+colnames(moran_plot_data) <- c("res", "res_lagged", "p_val")
+
+moran_plot_data$sign <- ifelse(moran_plot_data$p_val<=0.1,1,0)
+
+
+
+moran_plot_data$sign_col <- ifelse(moran_plot_data$sign == 1 & 
+                                     moran_plot_data$res<0 & moran_plot_data$res_lagged<0,
+                                   "significant low-low", "unsignificant")
+
+moran_plot_data$sign_col <- ifelse(moran_plot_data$sign == 1 & 
+                                     moran_plot_data$res>0 & moran_plot_data$res_lagged>0,
+                                   "significant high-high", moran_plot_data$sign_col)
+
+
+morans_plot_res <- ggplot(data = moran_plot_data, aes(res, res_lagged) )+
+  geom_point(aes(colour = factor(sign_col)),size = 1.5)+
+  stat_smooth(method = "lm", geom = "line", col = "orange", alpha = 0.4, size = 2)+
+  scale_color_manual(values = c('red','blue', "grey")) +
+  geom_hline(yintercept=0, color = "black", linetype = "dashed")+
+  geom_vline(xintercept=0, color = "black", linetype = "dashed")+
+  xlab("Residual value") + 
+  ylab("Spatially lagged residual value")+
+  theme_classic()+
+  theme(legend.position = c(0.2,0.8))+
+  labs(col = "cluster significance (LISA)")+
+  ggtitle("Moran's plot for residuals from regression (W1 matrix)")
+
+
+pal <- colorRampPalette(c("yellow","white" ,"blue"))
+
+
+loc_mor_pv_plot <- spplot(spatial_data_complete, zcol = "loc_mor_pv_res_w", colorkey = TRUE, col.regions = pal(100), cuts = 99,
+       par.settings = list(axis.line = list(col =  'transparent')),
+       main = "Associated LISA p-values (W1 matrix)")
+
+
+
+loc_mor2 <- localmoran(spatial_data_complete@data$res2, W2_list, p.adjust.method = "bonferroni")
+
+spatial_data_complete@data$loc_mor_i_res_w2 <- loc_mor2[,1]
+spatial_data_complete@data$loc_mor_pv_res_w2 <- loc_mor2[,5]
+
+
+
+spatial_data_complete$res_lagged2 <-lag.listw(x = W2_list, var = spatial_data_complete$res2)
+
+moran_plot_data2 <- data.frame(spatial_data_complete@data$res2, spatial_data_complete$res_lagged2, 
+                              spatial_data_complete@data$loc_mor_pv_res_w2)
+
+colnames(moran_plot_data2) <- c("res", "res_lagged", "p_val")
+
+moran_plot_data2$sign <- ifelse(moran_plot_data2$p_val<=0.1,1,0)
+
+
+
+moran_plot_data2$sign_col <- ifelse(moran_plot_data2$sign == 1 & 
+                                     moran_plot_data2$res<0 & moran_plot_data2$res_lagged<0,
+                                   "significant low-low", "unsignificant")
+
+moran_plot_data2$sign_col <- ifelse(moran_plot_data2$sign == 1 & 
+                                     moran_plot_data2$res>0 & moran_plot_data2$res_lagged>0,
+                                   "significant high-high", moran_plot_data2$sign_col)
+
+
+morans_plot_res2 <- ggplot(data = moran_plot_data2, aes(res, res_lagged) )+
+  geom_point(aes(colour = factor(sign_col)),size = 1.5)+
+  stat_smooth(method = "lm", geom = "line", col = "orange", alpha = 0.4, size = 2)+
+  scale_color_manual(values = c('red','blue', "grey")) +
+  geom_hline(yintercept=0, color = "black", linetype = "dashed")+
+  geom_vline(xintercept=0, color = "black", linetype = "dashed")+
+  xlab("Residual value") + 
+  ylab("Spatially lagged residual value")+
+  theme_classic()+
+  theme(legend.position = c(0.2,0.8))+
+  labs(col = "cluster significance (LISA)")+
+  ggtitle("Moran's plot for residuals from regression (W2 matrix)")
+
+
+loc_mor_pv_plot2 <- spplot(spatial_data_complete, zcol = "loc_mor_pv_res_w2", colorkey = TRUE, col.regions = pal(100), cuts = 99,
+       par.settings = list(axis.line = list(col =  'transparent')),
+       main = "Associated LISA p-values (W2 matrix)")
+
+
+
+grid.arrange(morans_plot_res, loc_mor_pv_plot, ncol = 2)
+grid.arrange(morans_plot_res2, loc_mor_pv_plot2, ncol = 2)
+```
+
+
+
+```{r, eval = FALSE}
+##########################################
+########## SPATIAL MODELS ############
+# w1
+
+## pure SAR model
+
+model_pSAR <- spautolm(spatial_data_complete@data$household_income ~ 1, listw = W_list)
+summary(model_pSAR)
+
+
+## SAR (SLM) model
+# ML estimation
+model_SAR_ML <- lagsarlm(household_income ~ unemployment + hh_urb_per +
+                           res_dev + gva_growth + ht_perc, listw = W_list,
+                         data = spatial_data_complete)
+summary(model_SAR_ML)
+
+#2SLS estimation
+model_SAR_2SLS <- stsls(household_income ~ unemployment + hh_urb_per +
+                          res_dev + gva_growth + ht_perc, listw = W_list,
+                        data = spatial_data_complete)
+summary(model_SAR_2SLS)
+
+
+## SEM model
+# ML estimation
+model_SEM_ML <- errorsarlm(household_income ~ unemployment + hh_urb_per +
+                             res_dev + gva_growth + ht_perc, listw = W_list,
+                           data = spatial_data_complete)
+summary(model_SEM_ML)
+
+#SGLS estimation
+model_SEM_SGLS <- GMerrorsar(household_income ~ unemployment + hh_urb_per +
+                               res_dev + gva_growth + ht_perc, listw = W_list,
+                             data = spatial_data_complete)
+summary(model_SEM_SGLS)
+
+## SLX model
+model_SLX <- lmSLX(household_income ~ unemployment + hh_urb_per +
+                     res_dev + gva_growth + ht_perc, listw = W_list,
+                   data = spatial_data_complete)
+summary(model_SLX)
+
+```
+
+
+
+# Summary
+
