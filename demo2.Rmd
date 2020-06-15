@@ -1,0 +1,41 @@
+---
+title: "Untitled"
+author: "Rafal Nowicki"
+date: "15 06 2020"
+output: html_document
+---
+
+<table style="text-align:center"><tr><td colspan="8" style="border-bottom: 1px solid black"></td></tr><tr><td style="text-align:left"></td><td colspan="7"><em>Dependent variable:</em></td></tr>
+<tr><td></td><td colspan="7" style="border-bottom: 1px solid black"></td></tr>
+<tr><td style="text-align:left"></td><td colspan="7">log(household_income)
+<tr><td style="text-align:left"></td><td><em>OLS</em></td><td><em>SAR</em></td><td><em>SEM</em></td><td><em>SLX</em></td><td><em>SARAR</em></td><td><em>SDM</em></td><td><em>SDEM</em></td></tr>
+<tr><td style="text-align:left"></td><td>(1)</td><td>(2)</td><td>(3)</td><td>(4)</td><td>(5)</td><td>(6)</td><td>(7)</td></tr>
+<tr><td colspan="8" style="border-bottom: 1px solid black"></td></tr><tr><td style="text-align:left">unemployment</td><td>-0.027<sup>***</sup></td><td>-0.019<sup>***</sup></td><td>-0.027<sup>***</sup></td><td>-0.021<sup>***</sup></td><td>-0.027<sup>***</sup></td><td>-0.021<sup>***</sup></td><td>-0.027<sup>***</sup></td></tr>
+<tr><td style="text-align:left"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td style="text-align:left">hh_urb_per</td><td>-0.001<sup>*</sup></td><td>-0.0003</td><td>0.0004</td><td>0.00003</td><td>0.0003</td><td>b</td><td>c<sup>*</sup></td></tr>
+<tr><td style="text-align:left"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td style="text-align:left">tert</td><td>-0.008<sup>***</sup></td><td>-0.002</td><td>0.001</td><td>-0.001</td><td>0.0006</td><td>f</td><td>g<sup>***</sup></td></tr>
+<tr><td style="text-align:left"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td style="text-align:left">ht_perc</td><td>0.055<sup>***</sup></td><td>0.027<sup>***</sup></td><td>0.016<sup>***</sup></td><td>0.026<sup>***</sup></td><td>0.016<sup>***</sup></td><td>i<sup>***</sup></td><td>j<sup>***</sup></td></tr>
+<tr><td style="text-align:left"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td style="text-align:left">lag.unemployment</td><td></td><td></td><td></td><td>0.001</td><td></td><td>1</td><td></td></tr>
+<tr><td style="text-align:left"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td style="text-align:left">lag.hh_urb_per</td><td></td><td></td><td></td><td>-0.002<sup>***</sup></td><td></td><td>2<sup>***</sup></td><td></td></tr>
+<tr><td style="text-align:left"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td style="text-align:left">lag.tert</td><td></td><td></td><td></td><td>-0.015<sup>***</sup></td><td></td><td>3<sup>***</sup></td><td></td></tr>
+<tr><td style="text-align:left"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td style="text-align:left">lag.ht_perc</td><td></td><td></td><td></td><td>0.083<sup>***</sup></td><td></td><td>4<sup>***</sup></td><td></td></tr>
+<tr><td style="text-align:left"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td style="text-align:left">Constant</td><td>10.110<sup>***</sup></td><td>4.588<sup>***</sup></td><td>9.889<sup>***</sup></td><td>10.231<sup>***</sup></td><td>9.082<sup>***</sup></td><td>y<sup>***</sup></td><td>z<sup>***</sup></td></tr>
+<tr><td style="text-align:left"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td style="text-align:left">&rho;</td><td>-</td><td>0.542<sup>***</sup></td><td>-</td><td>-</td><td>0.081</td><td>yy<sup>***</sup></td></tr>
+<tr><td style="text-align:left">&lambda;</td><td>-</td><td>-</td><td>0.848<sup>***</sup></td><td>-</td><td>0.819<sup>***</sup></td><td>jj<sup>***</sup></td></tr>
+<tr><td colspan="8" style="border-bottom: 1px solid black"></td></tr><tr><td style="text-align:left">Observations</td><td>91</td><td>91</td><td>91</td><td>91</td><td>91</td><td>91</td><td>91</td></tr>
+<tr><td style="text-align:left">R<sup>2</sup></td><td>0.650</td><td></td><td></td><td>0.786</td><td>0.650</td><td>0.786</td><td>0.650</td></tr>
+<tr><td style="text-align:left">Adjusted R<sup>2</sup></td><td>0.634</td><td></td><td></td><td>0.765</td><td>0.634</td><td>0.765</td><td>0.634</td></tr>
+<tr><td style="text-align:left">Log Likelihood</td><td></td><td>126.719</td><td>137.070</td><td></td><td></td><td></td><td></td></tr>
+<tr><td style="text-align:left">&sigma;<sup>2</sup></td><td></td><td>0.003</td><td>0.002</td><td></td><td></td><td></td><td></td></tr>
+<tr><td style="text-align:left">Akaike Inf. Crit.</td><td></td><td>-239.439</td><td>-260.140</td><td></td><td></td><td></td><td></td></tr>
+<tr><td style="text-align:left">LR Test (df = 1)</td><td></td><td>32.674<sup>***</sup></td><td>53.375<sup>***</sup></td><td></td><td></td><td></td><td></td></tr>
+<tr><td colspan="8" style="border-bottom: 1px solid black"></td></tr><tr><td style="text-align:left"><em>Note:</em></td><td colspan="7" style="text-align:right"><sup>*</sup>p<0.1; <sup>**</sup>p<0.05; <sup>***</sup>p<0.01</td></tr>
+</table>

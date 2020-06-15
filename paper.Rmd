@@ -1,5 +1,5 @@
 ---
-title: "Households' income across the Western Europe"
+title: "Households' income across Western Europe regions"
 author: "Rafal Nowicki"
 date: "14 06 2020"
 output:
@@ -24,13 +24,13 @@ library(mice)
 
 # Preliminary
 
-Regional variability of disposable households' income (expressed in PPS per inhabitant)  exceeded 15% in Western Europe in 2017 for NUTS 2 level and was probably even higher for more detailed levels of analysis such as NUTS 3. That fact raises some important questions. 
+Regional variability of disposable households' income (expressed in PPS Euro per inhabitant)  exceeded 15% in Western Europe in 2017 for NUTS 2 level and was probably even higher for more detailed levels of analysis such as NUTS 3. That fact raises some important questions. 
 
-The most interesting one is of course why are some regions rich whereas others are considered to be poor. The answer to this question may seem very complex and in fact it is but what we can do is to try to make some data-driven statements about this phenomenon. Our strategy in that matter will be to build a regression model incorporating some socio-economic variables that account for at least part of this variability. In that way we will be able to explain a bit of those inequalities and at the same time find out the magnitude of impact of some economic indicators as unemployment rate or the social ones as percentage of people with degree.
+The most interesting one is of course why are some regions rich whereas others are poor. The answer to this question may seem very complex and in fact it is but what we can do is to try to make some data-driven statements about this phenomenon. Our strategy in that matter will be to build a regression model incorporating some socio-economic variables that account for at least part of this variability. In that way we will be able to explain a bit of those inequalities and at the same time find out the magnitude of impact of some economic indicators as unemployment rate or the social ones as percentage of people with degree.
 
-Next question concerns strictly the distribution of disposable households' income in space. As we metioned above income is not evenly distributed across the Western Europe regions but having controlled for the most important socio-economic features are there any spatial patterns left or those variables are sufficient to explain it? To examine that we will use some spatial econometrics techniques as spatial regressions and indicators of spatial dependency.
+Next question concerns strictly the distribution of disposable households' income in space. As we metioned above income is not evenly distributed across Western Europe regions but having controlled for the most important socio-economic features are there any spatial patterns left or those variables are sufficient to explain it? To examine that we will use some spatial econometrics techniques as different spatial regressions and indicators of spatial dependency.
 
-The last issue is about the possibility of utilizing the concepts mentioned above. As it is getting extremely important to be able to predict the future in order to make reasonable decisions are we able to make some predictions regarding the change of income level in neighboring regions as a response to some kinds of investments? We will try to figure that out using simulations from models that behave the best.
+The last issue is about the possibility of utilizing the concepts mentioned above. As it is getting extremely important to be able to predict the future in order to make reasonable decisions are we able to make some predictions regarding the change of income level in neighbouring regions as a response to some kinds of investments? We will try to figure that out using simulations from models that behave the best.
 
 
 # Data
@@ -113,7 +113,6 @@ df <- unemp %>%
   left_join(fert, by = "geo") %>%
   left_join(hh_urb_percent, by = "geo") %>%
   left_join(tech_emp_perc, by = "geo")
-
 ```
 
 
@@ -135,7 +134,7 @@ kable(vars) %>%
   kable_styling(fixed_thead = T, font_size = 11.5)
 ```
 
-Next we show spatial disttribution of features of interest in form of choropleth. Due to lack of the data about R&D expenditures and Gross Value Added in France we will be forced to drop those variables from further analysis although big hopes were placed in their discriminatory power.
+Next we show spatial distribution of features of interest in form of choropleth. Due to lack of the data about R&D expenditures and Gross Value Added in France we will be forced to drop those variables from further analysis although big hopes were placed in their discriminatory power.
 
 As there are still some single regions in Austria not having all data we will input those values using PMM algorithm as we want to have residuals for all regions calculated.
 
@@ -258,20 +257,12 @@ plot.nb(cont2, centroids, pch = 16, col = "grey")
 
 ### Single Source Spatial models
 
-All four models presented below are characterized just by one source of spatial process.
-
-#### Pure Spatial Autocorrelation model
-The simpliest spatial model we can come up with is pSAR model. We will use it rather to quanitfy spatial dependency than to actually model something. 
-
-Its functional form looks as follows:
-
-$$y = \rho Wy + \varepsilon,$$
-where $\rho$ is spatial dependency parameter and $W$ represents one of spatial weights matrices presented above.
+All three models presented below are characterized just by one source of spatial process.
 
 
 #### Spatial Autocorrelation model
 
-The next model we will estimate is SAR model. It is appropriate when $X$ in region A has impact on $y$ in this region and at the same time $y$ in region A impacts $y$ in region B. In other words we do not assume spatial clustering of the causes, but spatial interactions in outcomes.
+First model we will estimate is SAR model. It is appropriate when $X$ in region A has impact on $y$ in this region and at the same time $y$ in region A impacts $y$ in region B. In other words we do not assume spatial clustering of the causes, but spatial interactions in outcomes.
 
 $$y=\rho \boldsymbol{W} y+\boldsymbol{X} \beta+\varepsilon$$
 
@@ -318,7 +309,7 @@ y=\boldsymbol{X} \beta+\boldsymbol{W} \boldsymbol{X} \theta+\varepsilon \\
 \end{array}$$
 
 # Results
-Let's estimate two linear models. The first one is the simple regression model with only unemployment as regressor and the second one is multiple regression model with variables unemployment, urbanization, tertiary education and high-tech employment incorporated. Having the results let's examine their residuals distributions.
+First we estimate two linear models. The first one is the simple regression model with only unemployment as regressor and the second one is multiple regression model with variables unemployment, urbanization, tertiary education and high-tech employment incorporated. Having the results let's examine their residuals distributions.
 ```{r, echo = FALSE, message = FALSE, warning = FALSE, include = FALSE, cache = TRUE}
 #### NAs imputation
 df_imputed <- mice(df[,-1], m=1, maxit = 50, method = 'pmm', seed = 500)
@@ -382,9 +373,9 @@ kable(p.val.mod) %>%
 
 ```
 
-Let's focus now on the multiple regression models as they are of more relevance for us now. Below on the left hand side we present Moran's plot for the residuals from multiple regression, i.e residuals vs their spatially lagged values (weighted average across the neighbours). The Moran's I statistic is simply the slope of such derived curve.
+Let's focus on the multiple regression models as they are of more relevance for us now. Below (upper row) we present Moran's plot for the residuals from multiple regression, i.e residuals vs their spatially lagged values (weighted average across the neighbours). The Moran's I statistic is simply the slope of such derived curve.
 
-To find out which regions drive Moran's I statistic the most we can utilize the so called Local Indicators of Spatial Association (LISA) and their p - values (with Bonferonni correction as it's multiple testing). They are presented below on the right hand side.
+To find out which regions drive Moran's I statistic the most we can utilize the so called Local Indicators of Spatial Association (LISA) and their p - values (with Bonferonni correction as it's multiple testing). They are presented below in the lower row.
 
 ```{r,fig.align = "center", fig.width = 14, fig.height = 8, cache = TRUE, echo = FALSE, warning = FALSE, message = FALSE}
 loc_mor <- localmoran(spatial_data_complete@data$res2, W_list, p.adjust.method = "bonferroni")
@@ -484,59 +475,209 @@ loc_mor_pv_plot2 <- spplot(spatial_data_complete, zcol = "loc_mor_pv_res_w2", co
 
 
 
-grid.arrange(morans_plot_res, loc_mor_pv_plot, ncol = 2)
-grid.arrange(morans_plot_res2, loc_mor_pv_plot2, ncol = 2)
+grid.arrange(morans_plot_res, morans_plot_res2, ncol = 2)
+grid.arrange(loc_mor_pv_plot, loc_mor_pv_plot2, ncol = 2)
+
 ```
 
+As we can see Austria, Bayern (high-high cluster) and Benelux regions (low-low cluster) contribute the most to spatial association statistic.
+
+Now we can try to figure out from which spatial process comes the data. In next section we will compare models presented above. Since the residuals for both contiguity matrices behave in a similar way, for simplicity from now on we will focus only on the situation with first order neighbourhood matrix.
+
+```{r, echo = FALSE, cache = TRUE, warning = FALSE, message = FALSE}
+#AIC(model_eu2_complete)
 
 
-```{r, eval = FALSE}
-##########################################
 ########## SPATIAL MODELS ############
 # w1
 
 ## pure SAR model
 
-model_pSAR <- spautolm(spatial_data_complete@data$household_income ~ 1, listw = W_list)
-summary(model_pSAR)
+model_pSAR <- spautolm(log(spatial_data_complete@data$household_income) ~ 1, listw = W_list)
+#summary(model_pSAR)
+
 
 
 ## SAR (SLM) model
 # ML estimation
-model_SAR_ML <- lagsarlm(household_income ~ unemployment + hh_urb_per +
-                           res_dev + gva_growth + ht_perc, listw = W_list,
+model_SAR_ML <- lagsarlm(log(household_income) ~ unemployment + hh_urb_per +
+                           tert + ht_perc, listw = W_list,
                          data = spatial_data_complete)
-summary(model_SAR_ML)
+#summary(model_SAR_ML)
+#AIC(model_SAR_ML)
 
-#2SLS estimation
-model_SAR_2SLS <- stsls(household_income ~ unemployment + hh_urb_per +
-                          res_dev + gva_growth + ht_perc, listw = W_list,
-                        data = spatial_data_complete)
-summary(model_SAR_2SLS)
+
+
 
 
 ## SEM model
 # ML estimation
-model_SEM_ML <- errorsarlm(household_income ~ unemployment + hh_urb_per +
-                             res_dev + gva_growth + ht_perc, listw = W_list,
-                           data = spatial_data_complete)
-summary(model_SEM_ML)
+model_SEM_ML <- errorsarlm(log(household_income) ~ unemployment + hh_urb_per +
+                           tert + ht_perc, listw = W_list,
+                         data = spatial_data_complete)
+#summary(model_SEM_ML)
+#AIC(model_SEM_ML)
 
-#SGLS estimation
-model_SEM_SGLS <- GMerrorsar(household_income ~ unemployment + hh_urb_per +
-                               res_dev + gva_growth + ht_perc, listw = W_list,
-                             data = spatial_data_complete)
-summary(model_SEM_SGLS)
+
+
 
 ## SLX model
-model_SLX <- lmSLX(household_income ~ unemployment + hh_urb_per +
-                     res_dev + gva_growth + ht_perc, listw = W_list,
-                   data = spatial_data_complete)
-summary(model_SLX)
+model_SLX <- lmSLX(log(household_income) ~ unemployment + hh_urb_per +
+                           tert + ht_perc, listw = W_list,
+                         data = spatial_data_complete)
+#summary(model_SLX)
+#AIC(model_SLX)
 
+
+
+## SARAR model
+
+model_SARAR_ML <- sacsarlm(log(household_income) ~ unemployment + hh_urb_per +
+                           tert + ht_perc, listw = W_list,
+                         data = spatial_data_complete)
+#summary(model_SARAR_ML)
+#AIC(model_SARAR_ML)
+
+
+
+## Durbin model
+
+Durbin_model <- lagsarlm(log(household_income) ~ unemployment + hh_urb_per +
+                           tert + ht_perc, listw = W_list,
+                         data = spatial_data_complete, type = "Durbin")
+#summary(Durbin_model)
+#AIC(Durbin_model)
+
+
+
+
+### SDEM model
+
+
+W <- listw2mat(W_list)
+X <- as.matrix(spatial_data_complete@data[,c(8,14,12,15)])
+WX <- W %*% X
+lag.unemployment <- WX [, 1]
+lag.hh_urb_per <- WX [, 2]
+lag.tert <- WX[,3]
+lag.ht_perc <- WX[,4]
+
+
+
+
+SDEM_model <- errorsarlm(log(household_income) ~ unemployment + hh_urb_per +
+                           tert + ht_perc + lag.unemployment + lag.hh_urb_per + lag.tert + lag.ht_perc , listw = W_list, data = spatial_data_complete)
+#summary(SDEM_model)
+#AIC(SDEM_model)
+
+
+```
+
+## Best model choice
+
+To compare different models we will use Akaike Information Criterion (AIC). The lower value AIC takes the better model fits to the data. Below we present a table with all models described in previous section. One important note to consider is the fact we use natural logaritm of households' income as dependent variable for simplicity of interpretations.
+
+
+<table style="text-align:center;margin-left:auto;margin-right:auto;width: 90%;"><tr><td colspan="8" style="border-bottom: 1px solid black"></td></tr><tr><td style="text-align:left"></td><td colspan="7"><em>Dependent variable:</em></td></tr>
+<tr><td></td><td colspan="7" style="border-bottom: 1px solid black"></td></tr>
+<tr><td style="text-align:left"></td><td colspan="7">log(household_income)
+<tr><td style="text-align:left"></td><td><em>OLS</em></td><td><em>SAR</em></td><td><em>SEM</em></td><td><em>SLX</em></td><td><em>SARAR</em></td><td><em>SDM</em></td><td><em>SDEM</em></td></tr>
+<tr><td style="text-align:left"></td><td>(1)</td><td>(2)</td><td>(3)</td><td>(4)</td><td>(5)</td><td>(6)</td><td>(7)</td></tr>
+<tr><td colspan="8" style="border-bottom: 1px solid black"></td></tr><tr><td style="text-align:left">unemployment</td><td>-0.027<sup>***</sup></td><td>-0.019<sup>***</sup></td><td>-0.027<sup>***</sup></td><td>-0.021<sup>***</sup></td><td>-0.027<sup>***</sup></td><td>-0.024<sup>***</sup></td><td>--0.023<sup>***</sup></td></tr>
+<tr><td style="text-align:left"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td style="text-align:left">hh_urb_per</td><td>-0.001<sup>*</sup></td><td>-0.0003</td><td>0.0004</td><td>0.00003</td><td>0.0003</td><td>0.0003</td><td>0.0004</td></tr>
+<tr><td style="text-align:left"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td style="text-align:left">tert</td><td>-0.008<sup>***</sup></td><td>-0.002</td><td>0.001</td><td>-0.001</td><td>0.0006</td><td>0.0007</td><td>-0.001</td></tr>
+<tr><td style="text-align:left"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td style="text-align:left">ht_perc</td><td>0.055<sup>***</sup></td><td>0.027<sup>***</sup></td><td>0.016<sup>***</sup></td><td>0.026<sup>***</sup></td><td>0.016<sup>***</sup></td><td>0.017<sup>***</sup></td><td>0.025<sup>***</sup></td></tr>
+<tr><td style="text-align:left"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td style="text-align:left">lag.unemployment</td><td></td><td></td><td></td><td>0.001</td><td></td><td>0.019<sup>***</sup></td><td>0.004</td></tr>
+<tr><td style="text-align:left"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td style="text-align:left">lag.hh_urb_per</td><td></td><td></td><td></td><td>-0.002<sup>***</sup></td><td></td><td>-0.0008</td><td>0.0002</td></tr>
+<tr><td style="text-align:left"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td style="text-align:left">lag.tert</td><td></td><td></td><td></td><td>-0.015<sup>***</sup></td><td></td><td>-0.008<sup>***</sup></td><td>-0.012<sup>***</sup></td></tr>
+<tr><td style="text-align:left"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td style="text-align:left">lag.ht_perc</td><td></td><td></td><td></td><td>0.083<sup>***</sup></td><td></td><td>0.032<sup>***</sup></td><td>0.060<sup>***</sup></td></tr>
+<tr><td style="text-align:left"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td style="text-align:left">Constant</td><td>10.110<sup>***</sup></td><td>4.588<sup>***</sup></td><td>9.889<sup>***</sup></td><td>10.231<sup>***</sup></td><td>9.082<sup>***</sup></td><td>3.696<sup>***</sup></td><td>10.031<sup>***</sup></td></tr>
+<tr><td style="text-align:left"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+<tr><td style="text-align:left">&rho;</td><td>-</td><td>0.542<sup>***</sup></td><td>-</td><td>-</td><td>0.081</td><td>0.635<sup>***</sup></td></tr>
+<tr><td style="text-align:left">&lambda;</td><td>-</td><td>-</td><td>0.848<sup>***</sup></td><td>-</td><td>0.819<sup>***</sup></td><td>-</td><td>0.726<sup>***</sup></td></tr>
+<tr><td colspan="8" style="border-bottom: 1px solid black"></td></tr><tr><td style="text-align:left">Observations</td><td>91</td><td>91</td><td>91</td><td>91</td><td>91</td><td>91</td><td>91</td></tr>
+<tr><td style="text-align:left">R<sup>2</sup></td><td>0.650</td><td></td><td></td><td>0.786</td><td></td><td></td><td></td></tr>
+<tr><td style="text-align:left">Akaike Inf. Crit.</td><td>-208.7</td><td>-239.4</td><td>-260.1</td><td>-245.3</td><td>-258.3</td><td>-269.7</td><td>-266.7</td></tr>
+<tr><td colspan="8" style="border-bottom: 1px solid black"></td></tr><tr><td style="text-align:left"><em>Note:</em></td><td colspan="7" style="text-align:right"><sup>*</sup>p<0.1; <sup>**</sup>p<0.05; <sup>***</sup>p<0.01</td></tr>
+</table>
+
+<br>
+
+Based on AIC criterion we find Durbin model (SDM) to fit data the best. We can try to think of some reasonable interpretations now. For that reason we have to calculate some derivaties as it is not as simple as in linear regression case. Below we present a table with direct impacts (occuring only in affected region) and their 95% confidence intervals.
+
+
+
+```{r, echo = FALSE, warning = FALSE}
+impacts.SDM <- impacts(Durbin_model, listw = W_list, zstats = TRUE, R = 200)
+kable(HPDinterval.lagImpact(impacts.SDM, prob = 0.95, choice = "direct")) %>%
+  kable_styling()
+#HPDinterval.lagImpact(impacts.SDM, prob = 0.95, choice = "indirect")
+#HPDinterval.lagImpact(impacts.SDM, prob = 0.95, choice = "total")
 ```
 
 
 
-# Summary
+a) Increase of 1 pp. of unemployment rate decreases households' income by about 2 percent ceteris paribus.
 
+b) Increase of 1 pp. of people employed in high-tech industries increases households' income by 2,6 percent ceteris paribus.
+
+c) There is indeed spatial spillover of households' income present across the regions.
+
+Next table presents total effects (in all regions together) of marginal change of independent variables. Here the situation is a bit different as tertiary education and high-tech employment impact are significant (negative and positive responisively). It seems to be quite interesting as it turns out a marginal increase of people share with a degree will result in overall decrease of households' income. It might be a bit unintuitive. But what we also observe is a very strong and significant overall impact of marginal increase of employment in high-tech sectors as we could expect.
+
+
+```{r, echo = FALSE, warning = FALSE}
+kable(HPDinterval.lagImpact(impacts.SDM, prob = 0.95, choice = "total")) %>%
+  kable_styling()
+```
+As we saw unemployment rate and employment in high-tech industries might explain a lot of regional differences in households' income.
+
+In next section we will try to make some prediction.
+
+## Simulation
+
+Now we will derive prediction of what would happen with households' income if there would be an investment in Rhein-Neckar region resulting in decrease of unemployment rate by 1 pp. 
+
+
+
+```{r, echo = FALSE, fig.align="center"}
+### SDM ######
+N = 91
+green_area <- rgb(24, 121, 104, 80, names = NULL, maxColorValue = 255)
+pal <- colorRampPalette(c("white", green_area), bias = 1)
+thresholds <- c(0, 0.00000001, 0.001 ,0.01,0.1, 0.3, 0.5, 0.999, 1,  Inf)
+
+sp.multiplier6 <- (solve(diag(N) - Durbin_model$rho * W))%*%(Durbin_model$coefficients[2]*diag(N) + Durbin_model$coefficients[6]*W)
+
+rownames(W) <- spatial_data_complete@data$NUTS_ID
+
+epsilon6 <- matrix(0, nrow = N, ncol = 1)
+epsilon6[59, 1] <- 100
+dY6 <- sp.multiplier6 %*% epsilon6
+
+dY6.regions <- data.frame(dY6, rownames(W), stringsAsFactors = FALSE)
+
+colnames(dY6.regions) <- c("dY6", "region")
+spatial.impact6 <- merge(x = spatial_data_complete, y = dY6.regions, by.x = "NUTS_ID", by.y = "region")
+
+spatial.impact6@data$cut_dY <- cut(spatial.impact6@data$dY, breaks = thresholds)
+
+spplot(spatial.impact6, zcol = "cut_dY", 
+       col.regions = pal(length(thresholds)), cuts = length(thresholds) - 1, 
+       colorkey = list(labels = list(breaks = seq(0.5, length(thresholds) - 0.5), labels = thresholds)), #col.regions = pal(100), cuts = 99, cex = 0.5,
+       par.settings = list(axis.line = list(col =  'transparent')),
+       main = "Impact of unit change in uneployment rate in Karlsruhe region on Y")
+```
+<br>
+According to our model the impact of change in unemployment rate by 1 percentage point will affect whole Western Europe but the neighbouring regions the most. An further area to investigate would be to conduct similar analysis but with different W matrix (maybe distance oriented) and on lower level like NUTS3. In that way we could draw more conclusive results.
+
+
+Github: https://github.com/Rafal-Nowicki/Mannheim-project 
